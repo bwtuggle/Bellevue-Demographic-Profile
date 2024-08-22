@@ -571,6 +571,11 @@ rm(list=ls(pattern="fb"),pob00toP,pobplot,years)
 
 # 2000 Census data in two parts - one for total/non-LEP & one for LEP. Then 
 # clean things up & merge them.
+langlabs <- load_variables(2000,"sf3") %>%
+  filter(str_detect(name,"P019")) %>%
+  select("variable"="name",
+         "label") 
+
 lang00a <- get_decennial(geography="place",state="WA",sumfile="sf3",year=2000,
                          variables = c("Total Lang Pop"="P109001",
                                        "English"="P109002",
