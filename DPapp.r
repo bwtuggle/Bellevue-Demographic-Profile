@@ -3,7 +3,7 @@
 ################################################################################
 
 # List of required package names
-packages <- c("leaflet","shiny","tmaptools","rsconnect")
+packages <- c("leaflet","plotly","rsconnect","shiny","tmaptools")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -13,9 +13,10 @@ if (any(installed_packages == FALSE)) {
 
 # Load the required libraries
 library(leaflet)        # For creating leaflet maps
+library(plotly)         # For loading/observing plotly figures
+library(rsconnect)      # For publishing Shiny Apps
 library(shiny)          # For creating interactive data dashboards
 library(tmaptools)      # For looking at color palettes
-library(rsconnect)      # For publishing Shiny Apps
 
 # Double check to make sure the workspace is loaded
 load("DPAppData.RData")
