@@ -161,10 +161,6 @@ agelabs <- acs1sub %>%
                        "65 years and over")) %>%
   select("variable"="name",
          "sex","age")
-agelabs <- acs1yr %>%
-  filter(str_detect(name,"B01001_")) %>%
-  select("variable"="name",
-         "label")
 
 # Now load the data, subset them to Bellevue, add join with the labels.
 agedat <- get_acs(geography="place",state="WA",year=syear,survey="acs1",
