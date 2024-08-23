@@ -1051,7 +1051,7 @@ racdat <- map_dfr(years, ~
 # Now create the figure & convert to a plotly plot. Then clean up the working 
 # memory a bit.
 racetsplot <- 
-  ggplot(racedat,aes(x=`year2`,y=`e`,
+  ggplot(racdat,aes(x=`year2`,y=`e`,
                      ymin=`e`-`moe`,ymax=`e`+`moe`,
                      color=factor(`label`,levels=c("White","Asian","Latino",
                                                       "Multiracial","Black",
@@ -1084,7 +1084,7 @@ racetsplotly <- ggplotly(racetsplot,tooltip="text") %>%
   layout(legend=list(x=100,y=.3),
          yaxis=list(tickformat=".0%")) 
 racetsplotly
-rm(racetsplot,racedat,redat,othdat,re1016,re1721,re22)
+rm(racetsplot,racdat,raclabs,years)
 
 
 
