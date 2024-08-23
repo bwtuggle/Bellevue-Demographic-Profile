@@ -994,66 +994,59 @@ rm(list=ls(pattern="pums"),langplot)
 
 
 
-# Now pull race/ethnicity data for Bellevue over time. Again done in multiple 
-# pulls due to changing tables over time.
-years <- lst(2010,2011,2012,2013,2014,2015,2016)
-re1016 <- map_dfr(years, ~
-                    get_acs(geography="place",state="WA",year=.x,survey="acs1",
-                            variables = c("White"           = "DP05_0072P",
-                                          "Black"           = "DP05_0073P",
-                                          "Asian"           = "DP05_0075P",
-                                          "Latino"          = "DP05_0066P",
-                                          "Indig"           = "DP05_0074P",
-                                          "Isles"           = "DP05_0076P",
-                                          "Oth"             = "DP05_0077P",
-                                          "Multiracial"     = "DP05_0078P")),
-                  .id="Year") 
+# Pull race/ethnicity data for Bellevue over time. First extract all the labels
+# from the variable list then use them to filter the DP05 data.
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022)
+raclabs <- map_dfr(years, ~
+                     load_variables(year=.x,dataset="acs1/profile"),
+                   .id="Year") %>%
+  filter(str_detect(name,"DP05")) %>%
+  separate(col="label",into=c("type","col2","col3","col4","col5","col6"),sep="!!") %>%
+  filter(type=="Percent" & col2=="HISPANIC OR LATINO AND RACE") %>%
+  mutate(across("type":"col5", ~str_remove(.x,":")),
+         "label"=case_when(col3=="Hispanic or Latino (of any race)" & is.na(col4)~"Latino",
+                           col4=="Hispanic or Latino (of any race)" & is.na(col5)~"Latino",
+                           
+                           col3=="Not Hispanic or Latino" & col4=="White alone"~"White",
+                           col4=="Not Hispanic or Latino" & col5=="White alone"~"White",
+                           
+                           col3=="Not Hispanic or Latino" & col4=="Asian alone"~"Asian",
+                           col4=="Not Hispanic or Latino" & col5=="Asian alone"~"Asian",
+                           
+                           col3=="Not Hispanic or Latino" & col4=="Black or African American alone"~"Black",
+                           col4=="Not Hispanic or Latino" & col5=="Black or African American alone"~"Black",
+                           
+                           col3=="Not Hispanic or Latino" & 
+                             col4 %in% c("American Indian and Alaska Native alone",
+                                         "Native Hawaiian and Other Pacific Islander alone",
+                                         "Some other race alone")~"All Other Groups",
+                           col4=="Not Hispanic or Latino" & 
+                             col5 %in% c("American Indian and Alaska Native alone",
+                                         "Native Hawaiian and Other Pacific Islander alone",
+                                         "Some other race alone","Some Other Race alone")~
+                             "All Other Groups",
+                           
+                           col3=="Not Hispanic or Latino" & col4 %in% c("Two or more races","Two or More Races") &
+                             is.na(col5)~"Multiracial",
+                           col4=="Not Hispanic or Latino" & col5=="Two or more races" &
+                             is.na(col6)~"Multiracial")) %>%
+  filter(!is.na(label)) %>%
+  select("Year",
+         "variable"="name",
+         "label")
 
-years <- lst(2017,2018,2019,2021)
-re1721 <- map_dfr(years, ~
-                    get_acs(geography="place",state="WA",year=.x,survey="acs1",
-                            variables = c("White"           = "DP05_0077P",
-                                          "Black"           = "DP05_0078P",
-                                          "Asian"           = "DP05_0080P",
-                                          "Latino"          = "DP05_0071P",
-                                          "Indig"           = "DP05_0079P",
-                                          "Isles"           = "DP05_0081P",
-                                          "Oth"             = "DP05_0082P",
-                                          "Multiracial"     = "DP05_0083P")),
-                  .id="Year") 
-
-re22 <- get_acs(geography="place",state="WA",year=2022,survey="acs1",
-                variables = c("White"           = "DP05_0079P",
-                              "Black"           = "DP05_0080P",
-                              "Asian"           = "DP05_0082P",
-                              "Latino"          = "DP05_0073P",
-                              "Indig"           = "DP05_0081P",
-                              "Isles"           = "DP05_0083P",
-                              "Oth"             = "DP05_0084P",
-                              "Multiracial"     = "DP05_0085P")) %>%
-  mutate("Year"="2022")
-
-redat <- bind_rows(re1016,re1721,re22) %>%
-  filter(GEOID=="5305210") 
-
-othdat <- redat %>%
-  filter(variable %in% c("Indig","Isles","Oth")) %>%
-  group_by(Year) %>%
-  summarise("GEOID"="5305210",
-            "NAME"="Bellevue city, Washington",
-            "variable"="All Other Groups",
-            "estimate"=sum(estimate),
-            "moe"=sqrt(sum(moe^2))) %>%
-  ungroup()
-
-racedat <- redat %>%
-  filter(!variable %in% c("Indig","Isles","Oth")) %>%
-  bind_rows(.,othdat) %>%
-  mutate("estimate"=estimate/100,
-         "moe"=round(moe/100,3),
-         "year2"=as.numeric(Year))
-
-
+racdat <- map_dfr(years, ~
+                    get_acs(state="WA",geography="place",survey="acs1",year=.x,
+                            table="DP05"),
+                  .id="Year") %>%
+  right_join(.,raclabs) %>%
+  filter(GEOID=="5305210") %>%
+  group_by(Year,label) %>%
+  summarise("GEOID"=first(GEOID),
+            "NAME"=first(NAME),
+            "e"=sum(estimate)/100,
+            "moe"=(sqrt(sum(moe^2)))/100,
+            "year2"=as.numeric(Year))
 
 # Now create the figure & convert to a plotly plot. Then clean up the working 
 # memory a bit.
