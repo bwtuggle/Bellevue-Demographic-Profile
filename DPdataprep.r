@@ -498,7 +498,7 @@ fb10toP_r <- map_dfr(years, ~
                        get_acs(state="WA",geography="place",survey="acs1",year=.x,
                                table="B05002"),
                      .id="Year") %>%
-  right_join(.,poblabs)
+  right_join(.,fblabs)
 
 fb10toP <- fb10toP_r %>%
   filter(GEOID=="5305210") %>%
