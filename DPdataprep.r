@@ -473,49 +473,46 @@ fb2000 <- get_decennial(geography="place",state="WA", sumfile = "sf3",year=2000,
 # Now use the tidycensus package to import the ACS 1-Year data. This has to be 
 # done in 3 steps because the number of estimates in the DP02 table changes over
 # time.
-years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018)
-fb10to18 <- map_dfr(years, ~
-                      get_acs(state="WA",geography="place",survey="acs1",year=.x,
-                              variables = c("Total"="DP02_0086",
-                                            "Born in WA"="DP02_0089",
-                                            "Born Outside Wa_c"="DP02_0090",
-                                            "Born Overseas_c"="DP02_0091",
-                                            "Naturalized Citizen"="DP02_0094",
-                                            "Noncitizen"="DP02_0095")),
-                    .id="Year") 
-fb2019 <- get_acs(state="WA",geography="place",survey="acs1",year=2019,
-                  variables = c("Total"="DP02_0087",
-                                "Born in WA"="DP02_0090",
-                                "Born Outside Wa_c"="DP02_0091",
-                                "Born Overseas_c"="DP02_0092",
-                                "Naturalized Citizen"="DP02_0095",
-                                "Noncitizen"="DP02_0096")) %>%
-  mutate("Year"="2019")
-years <- lst(2021,2022)
-fb21toP <- map_dfr(years, ~
-                     get_acs(state="WA",geography="place",survey="acs1",year=.x,
-                             variables = c("Total"="DP02_0088",
-                                           "Born in WA"="DP02_0091",
-                                           "Born Outside Wa_c"="DP02_0092",
-                                           "Born Overseas_c"="DP02_0093",
-                                           "Naturalized Citizen"="DP02_0096",
-                                           "Noncitizen"="DP02_0097")),
-                   .id="Year") 
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022)
+fblabs <- map_dfr(years, ~
+                     load_variables(year=.x,dataset="acs1"),
+                   .id="Year") %>%
+  filter(str_detect(name,"B05002")) %>%
+  separate(col="label",into=c("type","col2","col3","col4","col5"),sep="!!") %>%
+  mutate("label"=case_when(col4=="Born in state of residence"~"Born in WA",
+                           col4 %in% c("Born in other state in the United States","Born in other state in the United States:",
+                                       "Born outside the United States","Born outside the United States:") &
+                             is.na(col5)~"Born US Citizen (Outside WA)",
+                           col4=="Naturalized U.S. citizen" & is.na(col5)~
+                             "Naturalized Citizen",
+                           col4=="Not a U.S. citizen" & is.na(col5)~
+                             "Noncitizen",
+                           col2 %in% c("Total","Total:") & is.na(col3)~"Total",
+                           TRUE~NA)) %>%
+  filter(!is.na(label)) %>%
+  select("Year",
+         "variable"="name",
+         "label")
 
-# Now bind the ACS data together and process them.
-fb10toP <- bind_rows(fb10to18,fb2019,fb21toP) %>%
-  rename("e"=estimate) %>%
-  pivot_wider(names_from="variable",values_from=c("e","moe"),names_vary="slowest") %>%
-  mutate("e_Born US Citizen (Outside WA)"=`e_Born Outside Wa_c`+`e_Born Overseas_c`,
-         "moe_Born US Citizen (Outside WA)"=sqrt((`moe_Born Outside Wa_c`^2)+
-                                                   (`moe_Born Overseas_c`^2))) %>%
-  select("GEOID","NAME","Year","e_Total":"moe_Born in WA","e_Born US Citizen (Outside WA)",
-         "moe_Born US Citizen (Outside WA)","e_Naturalized Citizen":"moe_Noncitizen") %>%
-  pivot_longer(cols="e_Born in WA":"moe_Noncitizen",names_to="measure",values_to="value") %>%
+fb10toP_r <- map_dfr(years, ~
+                       get_acs(state="WA",geography="place",survey="acs1",year=.x,
+                               table="B05002"),
+                     .id="Year") %>%
+  right_join(.,poblabs)
+
+fb10toP <- fb10toP_r %>%
+  filter(GEOID=="5305210") %>%
+  group_by(Year,label) %>%
+  summarise("GEOID"=first(GEOID),
+            "NAME"=first(NAME),
+            "e"=sum(estimate),
+            "moe"=sqrt(sum(moe^2))) %>%
+  pivot_wider(names_from="label",values_from=c("e","moe"),names_vary="slowest") %>%
+  pivot_longer(cols="e_Born US Citizen (Outside WA)":"moe_Noncitizen",
+               names_to="measure",values_to="value") %>%
   separate(col="measure",into=c("type","measure"),sep="_") %>%
   pivot_wider(names_from="type",values_from="value") %>%
-  rename("value"=e) %>%
-  filter(GEOID=="5305210")
+  rename("value"=e)
 
 # Finally combine the cleaned Census & ACS data together for a time-series in 
 # Bellevue from 1970-2021. Then clean up the working memory a bit.
