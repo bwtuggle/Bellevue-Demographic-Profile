@@ -1051,13 +1051,13 @@ racdat <- map_dfr(years, ~
 # Now create the figure & convert to a plotly plot. Then clean up the working 
 # memory a bit.
 racetsplot <- 
-  ggplot(racedat,aes(x=`year2`,y=`estimate`,
-                     ymin=`estimate`-`moe`,ymax=`estimate`+`moe`,
-                     color=factor(`variable`,levels=c("White","Asian","Latino",
+  ggplot(racedat,aes(x=`year2`,y=`e`,
+                     ymin=`e`-`moe`,ymax=`e`+`moe`,
+                     color=factor(`label`,levels=c("White","Asian","Latino",
                                                       "Multiracial","Black",
                                                       "All Other Groups")),
-                     group=`variable`,
-                     text=paste("Estimate:",scales::percent(round(`estimate`,3)),
+                     group=`label`,
+                     text=paste("Estimate:",scales::percent(round(`e`,3)),
                                 "<br>",
                                 "MOE: ±",scales::percent(round(`moe`,3))))) +
   geom_errorbar(width=0.1,lwd=1.2,linetype=2,color="#9E1B18") + 
