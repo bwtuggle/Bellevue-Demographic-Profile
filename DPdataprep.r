@@ -233,108 +233,98 @@ rm(agelabs,agedat,agedat2,ageplot)
 
 
 
-# Now get some data on the racial/ethnic breakdown of CTs in King County. Then 
-# condense some of the categories. 
-kcracedat <- get_acs(geography="tract",state="WA",county="033",year=syear,
-                     survey="acs5",
-                     variables = c("Total Population"= "B01001_001",
-                                   "White"           = "DP05_0079P",
-                                   "Black"           = "DP05_0080P",
-                                   "Asian"           = "DP05_0082P",
-                                   "Latino"          = "DP05_0073P",
-                                   "Indig"           = "DP05_0081P",
-                                   "Isles"           = "DP05_0083P",
-                                   "Oth"             = "DP05_0084P",
-                                   "Twop"            = "DP05_0085P")) %>%
-  rename("e"=estimate) %>%
-  pivot_wider(names_from="variable",values_from=c("e","moe"),names_vary="slowest") %>%
-  mutate("e_Other"=e_Indig+e_Isles+e_Oth+e_Twop,
-         "moe_Other"=sqrt((moe_Indig^2)+(moe_Isles^2)+(moe_Oth^2)+(moe_Twop^2))) %>%
-  select("GEOID":"moe_Black","e_Asian","moe_Asian","e_Other","moe_Other") %>%
-  pivot_longer(cols = "e_Total Population":"moe_Other",names_to = "measure",values_to = "value") %>%
-  separate(col="measure",into=c("type","measure"),sep="_") %>%
-  pivot_wider(names_from="type",values_from="value")
-
-# Now get a list of Census blocks in Bellevue, retain only the blocks that had a
-# resident population in 2020, then use that to extract CTs in the city, & then 
-# subset the data. Then merge those data with shape data to make some maps. 
+# Now let's put some data together on the racial/ethnic diversity in Bellevue by
+# Census Tract. To start, get all the 2020 blocks in Bellevue. 
 bvue_blocks <- read_csv2(paste("https://www2.census.gov/geo/maps/DC2020/DC20BLK/",
                                "st53_wa/place/p5305210_bellevue/",
-                               "DC20BLK_P5305210_BLK2MS.txt",sep=""))
-
-# block populations
-blkpop <- get_decennial(geography="block",state="WA",county="033",year=2020,
-                        sumfile="pl",
-                        variables = c("pop"  = "P1_001N")) %>%
-  rename("pop"=value) %>%
-  select("GEOID","pop")
-
-# subset data to Bellevue blocks with people
-bvue_blks <- bvue_blocks %>%
+                               "DC20BLK_P5305210_BLK2MS.txt",sep="")) %>%
   mutate("GEOID"=as.character(FULLCODE)) %>%
-  select(GEOID) %>%
-  left_join(.,blkpop) %>%
-  filter(pop>0) %>%
-  select(-"pop")
+  select(GEOID)
 
-# Extract a list of the CTs with Bellevue residents
+# Now get 2020 block population data for King County, subset to Bvue blocks, & 
+# then to those that had anyone living in them.
+bvue_blks <- get_decennial(geography="block",state="WA",county="033",year=2020,
+                           sumfile="pl",
+                           variables = c("pop"  = "P1_001N")) %>%
+  rename("pop"=value) %>%
+  select("GEOID","pop") %>%
+  right_join(.,bvue_blocks) %>%
+  filter(pop>0)
+
+# Now summarize things to the tract level retaining the number of Bvue blocks 
+# within each Tract & their population.
 bvue_tracts <- bvue_blks %>%
   mutate("GEOID"=substr(GEOID,1,11)) %>%
-  distinct(GEOID)
+  group_by(GEOID) %>%
+  summarise("blks"=n(),
+            "pop"=sum(pop)) %>%
+  ungroup()
 
-# Now subset the KC data to just tracts with Bvue residents
-bvue_tracts_re <- right_join(kcracedat,bvue_tracts,by=c("GEOID"))
+# Now let's get race/ethnicity by tract across KC, subset to Bvue tracts, then
+# condense some of the categories. 
+bvue_tracts_re <- get_acs(geography="tract",state="WA",county="033",year=2022,
+                          survey="acs5",
+                          variables = c("Total Population"= "B01001_001",
+                                        "White"           = "DP05_0079P",
+                                        "Black"           = "DP05_0080P",
+                                        "Asian"           = "DP05_0082P",
+                                        "Latino"          = "DP05_0073P",
+                                        "Other"           = "DP05_0081P",
+                                        "Other"           = "DP05_0083P",
+                                        "Other"            = "DP05_0084P",
+                                        "Multiracial"     = "DP05_0085P")) %>%
+  rename("e"=estimate) %>%
+  right_join(.,bvue_tracts) %>%
+  group_by(GEOID,variable) %>%
+  summarise("e"=sum(e),
+            "moe"=sqrt(sum(moe^2)),
+            "moe"=round(moe,1)) %>%
+  ungroup() 
 
-# Now load in block level data for KC on race/ethnicity & create a tract id.
-kcracedat <- get_decennial(geography="block",state="WA",county="033",year=2020,
-                           sumfile="pl",
-                           variables = c("White"  = "P2_005N",
-                                         "Black"  = "P2_006N",
-                                         "Asian"  = "P2_008N",
-                                         "Latino" = "P2_002N",
-                                         "Indig"  = "P2_007N",
-                                         "Isles"  = "P2_009N",
-                                         "Oth"    = "P2_010N",
-                                         "Twop"   = "P2_011N")) %>%
+# Now we're going to compute each tract's block level dissimilarity score in terms
+# NH white vs. other. First get the data for KC, subset to Bvue blocks, condense
+# some of the categories & create a tract id.
+bvue_blksdat <- get_decennial(geography="block",state="WA",county="033",year=2020,
+                              sumfile="pl",
+                              variables = c("White"  = "P2_005N",
+                                            "BIPOC"  = "P2_006N",
+                                            "BIPOC"  = "P2_008N",
+                                            "BIPOC" = "P2_002N",
+                                            "BIPOC"  = "P2_007N",
+                                            "BIPOC"  = "P2_009N",
+                                            "BIPOC"    = "P2_010N",
+                                            "BIPOC"   = "P2_011N")) %>%
+  right_join(.,bvue_blks) %>%
   rename("e"=value) %>%
-  pivot_wider(names_from="variable",values_from="e") %>%
-  mutate("BIPOC"=Black+Asian+Latino+Indig+Isles+Oth+Twop) %>%
-  select("GEOID":"White","BIPOC") %>%
-  pivot_longer(cols="White":"BIPOC",names_to="measure",values_to="value") %>%
-  mutate("tract"=substr(GEOID,1,11)) %>%
-  select(-"NAME")
+  group_by(GEOID,variable) %>%
+  summarise("e"=sum(e)) %>%
+  ungroup() %>%
+  mutate("tract"=substr(GEOID,1,11)) 
 
-# Now subset the KC data to just blocks with Bvue residents
-bvue_blksdat <- right_join(kcracedat,bvue_blks,by=c("GEOID"))
-
-# Now compute the dissimilarity score with each tract in term of how ethnically
-# integrated they are
+# Now compute the dissimilarity score within each tract.
 bvuedis <- bvue_blksdat %>%
   group_by(tract) %>%
   group_modify(~
-                 dissimilarity(.x,group="measure",unit="GEOID",weight="value")) %>% 
-  mutate("est"=round(est,3)) %>%
-  arrange(desc(est)) %>%
-  rename("GEOID"=tract,
-         "e"=est) %>%
-  mutate("measure"="Dissimilarity") %>%
-  select(-"stat")
+                 dissimilarity(.x,group="variable",unit="GEOID",weight="e")
+  ) %>% 
+  mutate("variable"="Dissimilarity",
+         "e"=round(est,3)) %>%
+  select("GEOID"="tract",
+         "variable","e")
 
-# Now add the dissimilarity score to the race/ethnicity data for Bellevue created 
-# earlier.
-bvue_tracts_dat <- bind_rows(bvue_tracts_re,bvuedis) %>%
-  select(-"NAME")
+# Now bind the dissimilarity score to the race/ethnicity data for Bellevue 
+bvue_tracts_dat <- bind_rows(bvue_tracts_re,bvuedis)
 
 # Now get the map geometries for creating a visualization of the data in the app &
 # clean up the working memory a bit.
 bvue_tracts_map <- tracts(state="WA",county="033",year=2020) %>%
-  select("GEOID","NAMELSAD") %>%
-  rename("NAME"=NAMELSAD) %>%
+  select("GEOID",
+         "NAME"="NAMELSAD") %>%
+  right_join(.,bvue_tracts_dat) %>%
   erase_water(.,area_threshold=.6,year=2020) %>%
-  right_join(.,bvue_tracts_dat) %>%  
   st_transform(.,4326)
-rm(kcracedat,bvue_blocks,blkpop,bvue_blks,bvue_tracts,bvue_tracts_re,
-   bvue_blksdat,bvuedis,bvue_tracts_dat)
+rm(bvue_blocks,bvue_blks,bvue_tracts,bvue_tracts_re,bvue_blksdat,bvuedis,
+   bvue_tracts_dat)
 
 
 
