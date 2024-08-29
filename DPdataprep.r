@@ -1018,7 +1018,7 @@ raclabs <- map_dfr(years, ~
                            
                            col3=="Not Hispanic or Latino" & col4 %in% c("Two or more races","Two or More Races") &
                              is.na(col5)~"Multiracial",
-                           col4=="Not Hispanic or Latino" & col5=="Two or more races" &
+                           col4=="Not Hispanic or Latino" & col5 %in% c("Two or more races","Two or More Races") &
                              is.na(col6)~"Multiracial")) %>%
   filter(!is.na(label)) %>%
   select("Year",
