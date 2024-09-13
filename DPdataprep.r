@@ -43,16 +43,16 @@ rm(directory)
 
 # Set a global for the current ACS survey year. Update/double check each data 
 # pull in periods when the 5-year & 1-year data are different vintages.
-syear <- 2022
+syear <- 2023
 
 # Load in all of the available variables
 acs1yr <- load_variables(syear,"acs1")
 acs1sub <- load_variables(syear,"acs1/subject")
 acs1pro <- load_variables(syear,"acs1/profile")  
 decvars <- load_variables(2000,"sf3")
-acs5yr <- load_variables(syear,"acs5")
-acs5sub <- load_variables(syear,"acs5/subject")
-acs5pro <- load_variables(syear,"acs5/profile")  
+acs5yr <- load_variables(2022,"acs5")
+acs5sub <- load_variables(2022,"acs5/subject")
+acs5pro <- load_variables(2022,"acs5/profile")  
 
 
 
@@ -463,7 +463,7 @@ fb2000 <- get_decennial(geography="place",state="WA", sumfile = "sf3",year=2000,
 # Now use the tidycensus package to import the ACS 1-Year data. This has to be 
 # done in 3 steps because the number of estimates in the DP02 table changes over
 # time.
-years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022)
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022,2023)
 fblabs <- map_dfr(years, ~
                      load_variables(year=.x,dataset="acs1"),
                    .id="Year") %>%
@@ -588,105 +588,83 @@ lang00 <- bind_rows(lang00a,lang00b) %>%
                values_to="estimate",names_to="variable") %>%
   filter(GEOID=="5305210")
 
-# Now get each year of 1-Year ACS data for Bellevue. This has to be done in three
-# steps because the number of items in the DP tables has changed over time.
+# Now get each year of 1-Year ACS data for Bellevue. 
+# First extract and format labels for the desired measures from all of the years
+# of ACS data available.
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022,2023)
+langlabs <- map_dfr(years, ~ 
+                      load_variables(year=.x,dataset="acs1/profile"),
+                    .id="Year") %>%
+  filter(str_detect(name,"DP02_")) %>%
+  separate(col="label",into=c("type","col2","col3","col4","col5"),sep="!!") %>%
+  filter(type %in% c("Percent","Percent Estimate"),col2=="LANGUAGE SPOKEN AT HOME") %>%
+  mutate("label"=case_when(col3=="Language other than English" & is.na(col4)~"Not English (Percent)",
+                           col4=="Language other than English" & is.na(col5)~"Not English (Percent)",
+                           
+                           col3=="Language other than English" & col4=="Speak English less than \"very well\""~
+                             "Limited English Proficiency (Percent)",
+                           col4=="Language other than English" & col5=="Speak English less than \"very well\""~
+                             "Limited English Proficiency (Percent)",
+                           TRUE~NA)) %>%
+  filter(!is.na(label)) %>%
+  select("Year",
+         "variable"="name",
+         "label")
 
-# 2010-2018 ACS data
-years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018)
-lang10to18 <- map_dfr(years, ~
-                        get_acs(state="WA",geography="place",survey="acs1",year=.x,
-                                variables = c("English"="DP02_0111",
-                                              "Not English"="DP02_0112",
-                                              "Limited English Proficiency"="DP02_0113",
-                                              "Not English (Percent)"="DP02_0112P",
-                                              "Limited English Proficiency (Percent)"="DP02_0113P")),
-                      .id="Year") %>%
+# Now pull the data for Bellevue
+lang10toP <- map_dfr(years, ~
+                       get_acs(state="WA",geography="place",survey="acs1",year=.x,
+                               table = "DP02"),
+                     .id="Year") %>%
   filter(GEOID=="5305210") %>%
-  relocate("Year",.after="NAME")
+  right_join(.,langlabs) %>%
+  relocate("Year",.after="NAME") %>%
+  select(-"variable") %>%
+  rename("variable"="label")
 
-# 2019 ACS data
-lang19 <- get_acs(geography="place",state="WA",year=2019,survey="acs1",
-                  variables = c("English"="DP02_0112",
-                                "Not English"="DP02_0113",
-                                "Limited English Proficiency"="DP02_0114",
-                                "Not English (Percent)"="DP02_0113P",
-                                "Limited English Proficiency (Percent)"="DP02_0114P")) %>%
-  filter(GEOID=="5305210") %>%
-  mutate("Year"="2019") %>%
-  relocate("Year",.after="NAME")
+# Now get data for Seattle, King County, WA state, & the US in the most recent 
+# year of data.
+langlabsP <- langlabs %>%
+  mutate("yrid"=as.numeric(Year)) %>%
+  filter(yrid==syear) %>%
+  select(-"yrid")
 
-# 2021 ACS data 
-lang21 <- get_acs(geography="place",state="WA",year=2021,survey="acs1",
-                  variables = c("English"="DP02_0113",
-                                "Not English"="DP02_0114",
-                                "Limited English Proficiency"="DP02_0115",
-                                "Not English (Percent)"="DP02_0114P",
-                                "Limited English Proficiency (Percent)"="DP02_0115P")) %>%
-  filter(GEOID %in% c("5305210")) %>%
-  mutate("Year"="2021") %>%
-  relocate("Year",.after="NAME")
-
-# 2022 ACS data - note that we retain both Bellevue & Seattle below
-langP <- get_acs(geography="place",state="WA",year=syear,survey="acs1",
-                 variables = c("English"="DP02_0113",
-                               "Not English"="DP02_0114",
-                               "Limited English Proficiency"="DP02_0115",
-                               "Not English (Percent)"="DP02_0114P",
-                               "Limited English Proficiency (Percent)"="DP02_0115P")) %>%
-  filter(GEOID %in% c("5305210","5363000")) %>%
-  mutate("Year"="2022") %>%
-  relocate("Year",.after="NAME")
-
-# Now get data for King County, WA state, & the US in the most recent year of data.
-geos <- lst("county","state","us")
+geos <- lst("place","county","state","us")
 langgeos <- map_dfr(geos, ~
-                    get_acs(geography=.x,year=syear,survey="acs1",
-                            variables = c("English"="DP02_0113",
-                                          "Not English"="DP02_0114",
-                                          "Limited English Proficiency"="DP02_0115",
-                                          "Not English (Percent)"="DP02_0114P",
-                                          "Limited English Proficiency (Percent)"="DP02_0115P")),
+                      get_acs(geography=.x,year=syear,survey="acs1",
+                              table = "DP02"),
                     .id="level") %>%
-  mutate("Year"="2022",
-         "id"=case_when(level=="\"county\"" & GEOID=="53033"~1,
+  right_join(.,langlabsP) %>%
+  mutate("id"=case_when(level=="\"place\"" & GEOID=="5363000"~1,
+                        level=="\"county\"" & GEOID=="53033"~1,
                         level=="\"state\"" & GEOID=="53"~1,
                         level=="\"us\""~1,
                         TRUE~NA)) %>%
   relocate("Year",.after="NAME") %>%
   filter(!is.na(id)) %>%
-  select(-c("level","id"))
+  select(-c("level","id","variable")) %>%
+  rename("variable"="label")
 
 # Now bind all of the ACS data together
-lang10toP <- bind_rows(lang10to18,lang21,langP,langgeos) %>%
-  mutate("estimate"=case_when(variable %in% c("Not English (Percent)",
-                                              "Limited English Proficiency (Percent)")~
-                                estimate/100,
-                              TRUE~estimate),
-         "moe"=case_when(variable %in% c("Not English (Percent)",
-                                         "Limited English Proficiency (Percent)")~
-                           moe/100,
-                         TRUE~moe))
+lang10toPgeo <- bind_rows(lang10toP,langgeos) %>%
+  mutate("estimate"=estimate/100,
+         "moe"=moe/100)
 
 # Now bind the combined Census data with the combined ACS data
-spoke00toP <- bind_rows(lang00,lang10toP) 
-rm(list=ls(pattern="lang"))
-
-# Subset the data to just Bellevue
-bvspoke <- spoke00toP %>%
-  filter(GEOID=="5305210",variable %in% c("Not English (Percent)",
-                                          "Limited English Proficiency (Percent)")) %>%
+spoke00toP <- bind_rows(lang00,lang10toPgeo) %>%
   mutate("variable"=case_when(variable=="Not English (Percent)"~"Language Other Than English (Percent)",
                               TRUE~variable),
          "year"=as.numeric(Year))
+rm(list=ls(pattern="lang"),years,geos)
+
+# Subset the data to just Bellevue
+bvspoke <- spoke80toP %>%
+  filter(GEOID=="5305210")
 
 # Subset the current year's comparison estimates
-spokecomp <- spoke00toP %>%
-  filter(Year=="2022",variable %in% c("Not English (Percent)",
-                                      "Limited English Proficiency (Percent)")) %>%
-  mutate("variable"=case_when(variable=="Not English (Percent)"~"Language Other Than English (Percent)",
-                              TRUE~variable),
-         "year"=as.numeric(Year),
-         "NAME"=case_when(NAME=="Bellevue city, Washington"~"Bellevue",
+spokecomp <- spoke80toP %>%
+  filter(year==syear) %>%
+  mutate("NAME"=case_when(NAME=="Bellevue city, Washington"~"Bellevue",
                           NAME=="Seattle city, Washington"~"Seattle",
                           NAME=="King County, Washington"~"King County",
                           TRUE~NAME))
@@ -885,7 +863,7 @@ pumsvars <- pums_variables %>%
 
 # Load the data/desired variables along with the labels and person replication
 # weights.
-pumsdat5 <- get_pums(state="WA",survey="acs5",year=syear,
+pumsdat5 <- get_pums(state="WA",survey="acs5",year=2022,
                      rep_weights="person",recode=TRUE,  
                      variables=c("PUMA10","PUMA20","AGEP","LANX","LANP","ENG")) 
 
@@ -986,7 +964,7 @@ rm(list=ls(pattern="pums"),langplot)
 
 # Pull race/ethnicity data for Bellevue over time. First extract all the labels
 # from the variable list then use them to filter the DP05 data.
-years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022)
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022,2023)
 raclabs <- map_dfr(years, ~
                      load_variables(year=.x,dataset="acs1/profile"),
                    .id="Year") %>%
@@ -1085,83 +1063,74 @@ rm(racetsplot,racdat,raclabs,years)
 
 
 
-# Now get data on the relative size of age groups in Bellevue over time. Again,
-# in two steps because the tables changed slightly in 2017.
-years <- lst(2010,2011,2012,2013,2014,2015,2016)
-ageTS1016 <- map_dfr(years, ~
-                       get_acs(state="WA",geography="place",survey="acs1",year=.x,
-                               variables = c("Under 5"="S0101_C01_002",
-                                             "a5to14"="S0101_C01_020",
-                                             "a15to17"="S0101_C01_021",
-                                             "a18to24"="S0101_C01_022",
-                                             "a25to34"="DP05_0009P",
-                                             "a35to44"="DP05_0010P",
-                                             "a45to54"="DP05_0011P",
-                                             "a55to59"="DP05_0012P",
-                                             "a60to64"="DP05_0013P",
-                                             "Ages 65+"="S0101_C01_028")),
-                     .id="Year") 
+# Now get data on the relative size of age groups in Bellevue over time.
+# First extract and format labels for the desired measures from all of the years
+# of ACS data available. Note that from 2010-2016 the table contained ONLY 
+# percentages & after that BOTH counts and estimates.
+years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022,2023)
+agelabs <- map_dfr(years, ~ 
+                     load_variables(year=.x,dataset="acs1/subject"),
+                   .id="Year") %>%
+  filter(str_detect(name,"S0101_")) %>%
+  separate(col="label",into=c("type","col2","col3","col4","col5"),sep="!!") %>%
+  filter(type %in% c("Total","Percent") | col2=="Percent") %>%
+  filter(!(Year=="2017" & type=="Total")) %>%
+  mutate("label"=case_when(col4=="Under 5 years" | col5=="Under 5 years"~"Under 5",
+                           col4 %in% c("5 to 14 years","15 to 17 years") |
+                             col5 %in% c("5 to 14 years","15 to 17 years")~"Ages 5-17",
+                           col4 %in% c("18 to 24 years","25 to 29 years","30 to 34 years",
+                                       "35 to 39 years","40 to 44 years") |
+                             col5 %in% c("18 to 24 years","25 to 29 years","30 to 34 years",
+                                         "35 to 39 years","40 to 44 years")~"Ages 18-44",
+                           col4 %in% c("45 to 49 years","50 to 54 years","55 to 59 years",
+                                       "60 to 64 years") |
+                             col5 %in% c("45 to 49 years","50 to 54 years","55 to 59 years",
+                                         "60 to 64 years")~"Ages 45-64",
+                           col4=="65 years and over" | col5=="65 years and over"~"Ages 65+",
+                           TRUE~NA)) %>%
+  filter(!is.na(label)) %>%
+  select("Year",
+         "variable"="name",
+         "label")
 
-years <- lst(2017,2018,2019,2021,2022)
-ageTS1722 <- map_dfr(years, ~
-                       get_acs(state="WA",geography="place",survey="acs1",year=.x,
-                               variables = c("Under 5"="S0101_C02_002",
-                                             "a5to14"="S0101_C02_020",
-                                             "a15to17"="S0101_C02_021",
-                                             "a18to24"="S0101_C02_023",
-                                             "a25to34"="DP05_0010P",
-                                             "a35to44"="DP05_0011P",
-                                             "a45to54"="DP05_0012P",
-                                             "a55to59"="DP05_0013P",
-                                             "a60to64"="DP05_0014P",
-                                             "Ages 65+"="S0101_C02_030")),
-                     .id="Year") 
-
-# Now bind the ACS data together and process them.
-ageTS <- bind_rows(ageTS1016,ageTS1722) %>%
+# Now pull the data for Bellevue
+ageTS_r <- map_dfr(years, ~
+                     get_acs(state="WA",geography="place",survey="acs1",year=.x,
+                             table = "S0101"),
+                   .id="Year") %>%
   filter(GEOID=="5305210") %>%
-  rename("e"=estimate) %>%
-  pivot_wider(names_from="variable",values_from=c("e","moe"),names_vary="slowest") %>%
-  mutate("s_Under 5"=`e_Under 5`,
-         
-         "e_Ages 5-17"=`e_a5to14`+`e_a15to17`,
-         "moe_Ages 5-17"=sqrt((`moe_a5to14`^2)+(`moe_a15to17`^2)),
-         "moe_Ages 5-17"=round(`moe_Ages 5-17`,1),
-         "s_Ages 5-17"=`s_Under 5`+`e_Ages 5-17`,
-         
-         "e_Ages 18-44"=`e_a18to24`+`e_a25to34`+`e_a35to44`,
-         "moe_Ages 18-44"=sqrt((`moe_a18to24`^2)+(`moe_a25to34`^2)+(`moe_a35to44`^2)),
-         "moe_Ages 18-44"=round(`moe_Ages 18-44`,1),
-         "s_Ages 18-44"=`s_Ages 5-17`+`e_Ages 18-44`,
-         
-         "e_Ages 45-64"=`e_a45to54`+`e_a55to59`+`e_a60to64`,
-         "moe_Ages 45-64"=sqrt((`moe_a55to59`^2)+(`moe_a25to34`^2)+(`moe_a60to64`^2)),
-         "moe_Ages 45-64"=round(`moe_Ages 45-64`,1),
-         "s_Ages 45-64"=`s_Ages 18-44`+`e_Ages 45-64`,
-         
-         "s_Ages 65+"=`s_Ages 45-64`+`e_Ages 65+`) %>%
-  select("Year":"moe_Under 5","s_Under 5":"s_Ages 45-64","e_Ages 65+",
-         "moe_Ages 65+","s_Ages 65+") %>%
-  pivot_longer(cols="e_Under 5":"s_Ages 65+",names_to="measure",values_to="value") %>%
-  separate(col="measure",into=c("type","measure"),sep="_") %>%
-  pivot_wider(names_from="type",values_from="value") %>%
-  mutate("year2"=as.numeric(Year),
-         "e"=e/100,
-         "moe"=moe/100,
-         "s"=s/100)
+  right_join(.,agelabs) %>%
+  relocate("Year",.after="NAME") %>%
+  select(-"variable") %>%
+  rename("variable"="label")
 
-# Now make the stacked area plot & clean up the working memory.
+# Now comllapse the data by age group & format some things for plotting
+ageTS <- ageTS_r %>%
+  group_by(Year,variable) %>%
+  summarise("e"=sum(estimate),
+            "moe"=sqrt(sum(moe^2))) %>%
+  ungroup() %>%
+  mutate("factid"=case_when(variable=="Under 5"~1,
+                            variable=="Ages 5-17"~2,
+                            variable=="Ages 18-44"~3,
+                            variable=="Ages 45-64"~4,
+                            TRUE~5),
+         "fctlev"=fct_reorder(variable,factid),
+         "fctlevalt"=fct_reorder(variable,-factid)) %>%
+  arrange(Year,fctlev) %>%
+  group_by(Year) %>%
+  mutate("e"=e/100,
+         "moe"=round(moe,1)/100,
+         "s"=cumsum(e),
+         "year2"=as.numeric(Year))
+
 ageTSplot <- 
   ggplot(ageTS,aes(x=`year2`,y=`e`,
-                   fill=factor(`measure`,levels=c("Ages 65+","Ages 45-64",
-                                                  "Ages 18-44","Ages 5-17",
-                                                  "Under 5")))) +    
+                   fill=`fctlevalt`)) +    
   scale_fill_manual(values = c("#006598","#C16623","#3B6D64","#4B9DA5","#660C53")) +
   geom_area() +
   geom_point(size=5,alpha=0,aes(x=`year2`,y=`s`,
-                                fill=factor(`measure`,levels=c("Ages 65+","Ages 45-64",
-                                                               "Ages 18-44","Ages 5-17",
-                                                               "Under 5")),
+                                fill=`fctlevalt`,
                                 text=paste("Estimate:",scales::percent(`e`),
                                            "<br>",
                                            "MOE: ±",scales::percent(`moe`)))) +
@@ -1182,7 +1151,7 @@ ageTSplotly <- ggplotly(ageTSplot,tooltip = "text") %>%
   layout(legend=list(x=100,y=.6),
          yaxis=list(tickformat=".0%")) 
 ageTSplotly
-rm(ageTS1016,ageTS1722,ageTS,ageTSplot)
+rm(ageTS,ageTS_r,agelabs,ageTSplot,years)
 
 
 
