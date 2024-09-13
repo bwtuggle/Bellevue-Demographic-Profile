@@ -95,10 +95,10 @@ ui <- fluidPage(
                    would indicate complete segregation.")),
         
         tabPanel("Race/Ethnicity (2/2)",                                                       
-                 h3("Racial & Ethnic Composition of Bellevue Population (2010-2022)"),   
+                 h3("Racial & Ethnic Composition of Bellevue Population (2010-2023)"),   
                  plotlyOutput("racets",height="600"),
                  p(strong("Source: "),                                                   
-                   tags$a(href="https://data.census.gov/","2010-2019 & 2021-2022 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2010-2019 & 2021-2023 American Community Survey."), 
                    "1-Year Data Profiles (Table DP05).")),
         
         tabPanel("Total Population",                                                     
@@ -115,10 +115,10 @@ ui <- fluidPage(
                           "Bellevue Timeline."))),
         
         tabPanel("Age & Sex",                                                            
-                 h3("Count of Bellevue Residents by Age & Sex (2022)"),
+                 h3("Count of Bellevue Residents by Age & Sex (2023)"),
                  plotlyOutput("age",height="600"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2022 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
                    "1-Year Detailed Tables (Table B01001).")),
         
         tabPanel("Age & Race/Ethnicity",                                                 
@@ -129,45 +129,45 @@ ui <- fluidPage(
                    "5-Year Detailed Tables (Table B01001B-I).")),
         
         tabPanel("Age Over Time",                                                 
-                 h3("Percentage of Bellevue Residents by Age Group (2010-2022)"),
+                 h3("Percentage of Bellevue Residents by Age Group (2010-2023)"),
                  plotlyOutput("ageTS",height="600"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2022 1-Year Subject Tables & Data Profiles (Tables S0101 & DP05).")),
+                   "2010-2019 & 2021-2023 1-Year Subject Tables & Data Profiles (Tables S0101 & DP05).")),
         
         tabPanel("Place of Birth/Citizenship",                                           
-                 h3("Count of Bellevue Residents by Place of Birth/Citizenship (2000-2022)"),
+                 h3("Count of Bellevue Residents by Place of Birth/Citizenship (2000-2023)"),
                  plotlyOutput("pob",height="600"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
                    "2000 Decennial Census (Table DP2);", 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2022 1-Year Data Profiles (Table DP02).")),
+                   "2010-2019 & 2021-2023 1-Year Data Profiles (Table DP02).")),
         
         tabPanel("English Speaking Ability (1/2)",                                      
                  h3("Percentage of Bellevue Residents by Primary Language Spoken at
-                    Home & English Proficiency (2000-2022)"),
+                    Home & English Proficiency (2000-2023)"),
                  plotlyOutput("bvspoke",height="600"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
                    "2000 Decennial Census (Table DP2);", 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2022 1-Year Data Profiles (Table DP02).")),
+                   "2010-2019 & 2021-2023 1-Year Data Profiles (Table DP02).")),
         
         tabPanel("English Speaking Ability (2/2)",                                      
                  h3("Percentage of Residents by Primary Language Spoken at
-                    Home & English Proficiency (2022)"),
+                    Home & English Proficiency (2023)"),
                  plotlyOutput("spokecomp1",height="600"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2022 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
                    "1-Year Data Profiles (Table DP02).")),
         
         tabPanel("Household Type & Age",                                                
                  h3("Count of Bellevue Households by Household Type & Head of 
-                    Household Age (2022)"),
+                    Household Age (2023)"),
                  plotlyOutput("hhead",height="600"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2022 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
                    "1-Year Detailed Tables (Table B25011).")),
         
         tabPanel("Top 10 Languages",                                                    
