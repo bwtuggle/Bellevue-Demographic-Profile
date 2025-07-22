@@ -75,11 +75,11 @@ hexcodes <- c("#006598","#C16623","#3B6D64","#4B9DA5","#660C53","#4E842A",
 
 # Download Bellevue population data from the WA Office of Financial Management 
 # for each year from the present back through 1968. The raw OFM file has some 
-# extraneous columns & weird formatting. The code below cleans the data up a 
-# little bit and drop all of the non-Bvue area data.
+# extraneous columns & weird formatting. I simply clean them up a 
+# little bit and drop all of the non-Bvue area data below.
 
 # Save the url where the April 1 historical population data are on the web & 
-# create a tempfile to store the data at.
+# create a tempfile to store the data as
 url <- paste0("https://ofm.wa.gov/sites/default/files/public/dataresearch/pop/april1/hseries/",
               "ofm_april1_postcensal_estimates_pop_1960-present.xlsx")
 tempdat <- tempfile()
@@ -91,7 +91,8 @@ ofmpop1960<-read_excel(path=tempdat,sheet="Population",skip=3) %>%
          "1980 Census Count of Total Population"=`\r\n1980 \r\nCensus Count of Total Population`,
          "1990 Census Count of Total Population"=`\r\n1990 \r\nCensus Count of Total Population`,
          "2000 Census Count of Total Population"=`\r\n2000 \r\nCensus Count of Total Population`,
-         "2010 Census Count of Total Population"=`\r\n2010 \r\nCensus Count of Total Population`) %>%
+         "2010 Census Count of Total Population"=`\r\n2010 \r\nCensus Count of Total Population`,
+         "2020 Census Count of Total Population"=`\r\n2020 \r\nCensus Count of Total Population`) %>%
   filter(Jurisdiction=="Bellevue") %>% 
   select_if(~ !any(is.na(.))) %>%
   select("County":"Jurisdiction",
@@ -99,24 +100,37 @@ ofmpop1960<-read_excel(path=tempdat,sheet="Population",skip=3) %>%
          "1980 Census Count of Total Population":"1989 Postcensal Estimate of Total Population",
          "1990 Census Count of Total Population":"1999 Postcensal Estimate of Total Population",
          "2000 Census Count of Total Population":"2009 Postcensal Estimate of Total Population",
-         "2010 Census Count of Total Population":"2024 Postcensal Estimate of Total Population") %>%
-  pivot_longer(cols="1968 Postcensal Estimate of Total Population":"2024 Postcensal Estimate of Total Population",
+         "2010 Census Count of Total Population":"2019 Postcensal Estimate of Total Population",
+         "2020 Census Count of Total Population":"2025 Postcensal Estimate of Total Population") %>%
+  pivot_longer(cols="1968 Postcensal Estimate of Total Population":"2025 Postcensal Estimate of Total Population",
                names_to="year",values_to="population") %>%
   filter(!population %in% c("*","$")) %>%
   separate(year,into=c("year","program"),sep= " ") %>%
   mutate("year"= as.double(year),
-         "population"= as.double(population)) %>%
-  mutate("population2"=case_when(year %in% c(1968,1970,1980,1990,2000,2010,2024)~
+         "population"= as.double(population))
+
+# Now load the population data from 1953-1967 taken from the Bellevue Timeline
+# history book published by UW Press & combine the two data files
+bvuepop1953 <- read_excel(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                          "General/Common Data Warehouse/Bellevue Population 1953-1967.xlsx"),
+                          sheet="Data") %>%
+  mutate(County="King",
+         Jurisdiction="Bellevue",
+         program="Bellevue Timeline")
+bvuepop <- bind_rows(bvuepop1953,ofmpop1960) %>%
+  filter(!is.na(population)) %>%
+  arrange(year) %>%
+  mutate("population2"=case_when(year %in% c(1953,1960,1970,1980,1990,2000,2010,
+                                             2020,2025)~
                                    population,
                                  TRUE~NA))
 
-# Now plot the data & convert to an interactive plotly figure.
-popplot <- ggplot(data=ofmpop1960,
+popplot <- ggplot(data=bvuepop,
                   aes(x=`year`,y=`population`,group=1,
                       text=paste("Estimate:",scales::comma(`population`)))) +
   geom_line(lwd=2,color="#006598") + 
   geom_point(aes(x=`year`,y=`population2`),color="#C16623",size=5) +
-  geom_text(aes(x=`year`,y=`population2`),label=comma(ofmpop1960$`population2`),
+  geom_text(aes(x=`year`,y=`population2`),label=comma(bvuepop$`population2`),
             nudge_x=2.5,nudge_y=-5000,color="#006598") +
   theme_minimal() + 
   theme(legend.title=element_blank()) + 
@@ -124,7 +138,8 @@ popplot <- ggplot(data=ofmpop1960,
   scale_y_continuous(breaks=c(0,25000,50000,75000,100000,125000,150000), 
                      limits=c(0,165000),
                      labels=c("0","25k","50k","75k","100k","125k","150k")) +
-  scale_x_continuous(breaks=c(1968,1980,1990,2000,2010,2024)) +
+  scale_x_continuous(breaks=c(1953,1960,1970,1980,1990,2000,2010,2020,
+                              2025)) +
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
         panel.grid.minor.y=element_blank(),
@@ -136,7 +151,7 @@ popplotly <- ggplotly(popplot,tooltip="text")
 popplotly
 
 # Now clean up the working memory a bit
-rm(ofmpop1960,popplot,popdl,tempdat,url)
+rm(bvuepop,bvuepop1953,ofmpop1960,popplot,tempdat,url)
 
 
 
@@ -148,17 +163,16 @@ rm(ofmpop1960,popplot,popdl,tempdat,url)
 
 
 # Now get data on the age distribution in Bellevue broken down by sex in the most
-# current year of data available. First, pull the data labels for Subject Table 
-# S0101 from the variable list & retain the labels of interest.
+# current year of data available.
 agelabs <- acs1sub %>%
   filter(str_detect(name,"S0101")) %>%
   separate(col="label",into=c("col1","sex","co3","col4","age"),sep="!!") %>%
   filter(sex %in% c("Male","Female"),
          age %in% c("Under 5 years","5 to 9 years","10 to 14 years","15 to 17 years",
-                       "18 to 24 years","25 to 29 years","30 to 34 years",
-                       "35 to 39 years","40 to 44 years","45 to 49 years",
-                       "50 to 54 years","55 to 59 years","60 to 64 years",
-                       "65 years and over")) %>%
+                    "18 to 24 years","25 to 29 years","30 to 34 years",
+                    "35 to 39 years","40 to 44 years","45 to 49 years",
+                    "50 to 54 years","55 to 59 years","60 to 64 years",
+                    "65 years and over")) %>%
   select("variable"="name",
          "sex","age")
 
@@ -233,6 +247,7 @@ rm(agelabs,agedat,agedat2,ageplot)
 
 
 
+
 # Now let's put some data together on the racial/ethnic diversity in Bellevue by
 # Census Tract. To start, get all the 2020 blocks in Bellevue. 
 bvue_blocks <- read_csv2(paste("https://www2.census.gov/geo/maps/DC2020/DC20BLK/",
@@ -262,24 +277,46 @@ bvue_tracts <- bvue_blks %>%
 
 # Now let's get race/ethnicity by tract across KC, subset to Bvue tracts, then
 # condense some of the categories. 
-bvue_tracts_re <- get_acs(geography="tract",state="WA",county="033",year=2022,
-                          survey="acs5",
-                          variables = c("Total Population"= "B01001_001",
-                                        "White"           = "DP05_0079P",
-                                        "Black"           = "DP05_0080P",
-                                        "Asian"           = "DP05_0082P",
-                                        "Latino"          = "DP05_0073P",
-                                        "Other"           = "DP05_0081P",
-                                        "Other"           = "DP05_0083P",
-                                        "Other"            = "DP05_0084P",
-                                        "Multiracial"     = "DP05_0085P")) %>%
+bvue_relabs <- load_variables(year=syear,dataset="acs5/profile") %>%
+  filter(str_detect(name,"DP05")) %>%
+  separate(col="label",into=c("col1","col2","col3","col4","col5","col6"),sep="!!") %>%
+  mutate("label"=case_when(col1=="Estimate" & col2=="SEX AND AGE" & 
+                             col3=="Total population" & is.na(col4)~"Total Population",
+                           
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Not Hispanic or Latino" & col5=="White alone"~"White",
+                           
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Not Hispanic or Latino" & 
+                             col5=="Black or African American alone"~"Black",
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Not Hispanic or Latino" & col5=="Asian alone"~"Asian",
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Not Hispanic or Latino" & 
+                             col5 %in% c("American Indian and Alaska Native alone",
+                                         "Native Hawaiian and Other Pacific Islander alone",
+                                         "Some Other Race alone")~"Other",
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Not Hispanic or Latino" & col5=="Two or More Races" &
+                             is.na(col6)~"Multiracial",
+                           col1=="Percent" & col2=="HISPANIC OR LATINO AND RACE" &
+                             col4=="Hispanic or Latino (of any race)" & is.na(col5)~"Latino",
+                           TRUE~NA)) %>%
+  select("variable"="name",
+         "label") %>%
+  filter(!is.na(label))
+
+bvue_tracts_re <- get_acs(geography="tract",state="WA",county="033",year=syear,
+                          survey="acs5",table="DP05") %>%
   rename("e"=estimate) %>%
   right_join(.,bvue_tracts) %>%
-  group_by(GEOID,variable) %>%
+  right_join(.,bvue_relabs) %>%
+  group_by(GEOID,label) %>%
   summarise("e"=sum(e),
             "moe"=sqrt(sum(moe^2)),
             "moe"=round(moe,1)) %>%
-  ungroup() 
+  ungroup() %>%
+  rename("variable"="label")
 
 # Now we're going to compute each tract's block level dissimilarity score in terms
 # NH white vs. other. First get the data for KC, subset to Bvue blocks, condense
@@ -324,7 +361,7 @@ bvue_tracts_map <- tracts(state="WA",county="033",year=2020) %>%
   erase_water(.,area_threshold=.6,year=2020) %>%
   st_transform(.,4326)
 rm(bvue_blocks,bvue_blks,bvue_tracts,bvue_tracts_re,bvue_blksdat,bvuedis,
-   bvue_tracts_dat)
+   bvue_tracts_dat,bvue_relabs)
 
 
 
@@ -343,12 +380,12 @@ rcagelabs <- acs5yr %>%
   filter(!str_detect(name,"B01001_")) %>%
   select(-geography) %>%
   rename("variable"="name")
+
 acstables <- c("B01001B","B01001C","B01001D","B01001E","B01001F",
                "B01001G","B01001H","B01001I")
-
 rcagedat <- map_dfr(acstables, ~
                       get_acs(geography="place",state="WA",year=syear,survey="acs5",
-                    table = .x)) %>%
+                              table = .x)) %>%
   filter(GEOID=="5305210") %>%
   left_join(.,rcagelabs) %>%
   separate(col="label",into = c("col1","col2","sex","age"),sep="!!") %>%
@@ -444,6 +481,68 @@ rm(acstables,rcagelabs,rcagedat,rcagedat2,rcageplot)
 
 
 
+# Load/process the 1970 Census data downloaded through NHGIS.
+fb1970 <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                          "General/Common Data Warehouse/NHGIS Downloads/",
+                          "City/Place of Birth (1970-1990)/",
+                          "nhgis0009_ds99_1970_place.csv")) %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue") %>%
+  mutate("Year"="1970",
+         "Born in WA"=C14001,
+         "Born US Citizen (Outside WA)"=C14002+C14003+C14004+C14005+C14006+C14007,
+         "Naturalized Citizen"=C12006+C12007+C12008+C12009+C12010,
+         "Noncitizen"=C12011+C12012+C12013+C12014+C12015) %>%
+  select("STATE","PLACE","Year":"Noncitizen") %>%
+  pivot_longer(cols="Born in WA":"Noncitizen",names_to="measure",values_to="value")
+
+# Load/process the 1980 Census data downloaded through NHGIS. We have to work 
+# with two tables of data.
+fb1980a <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                           "General/Common Data Warehouse/NHGIS Downloads/",
+                           "City/Place of Birth (1970-1990)/",
+                           "nhgis0008_ds107_1980_place.csv")) %>%
+  mutate("Year"="1980",
+         "Born in WA"=DG6001,
+         "Born US Citizen (Outside WA)"=DG6002+DG6003+DG6004) %>%
+  select("STATE","PLACE","Year":"Born US Citizen (Outside WA)") %>%
+  pivot_longer(cols="Born in WA":"Born US Citizen (Outside WA)",names_to="measure",values_to="value") %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue") 
+
+fb1980b <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                           "General/Common Data Warehouse/NHGIS Downloads/",
+                           "City/Place of Birth (1970-1990)/",
+                           "nhgis0008_ds111_1980_place.csv")) %>%
+  mutate("Year"="1980",
+         "Naturalized Citizen"=DZR002,
+         "Noncitizen"=DZR003) %>%
+  select("STATE","PLACE","Year":"Noncitizen") %>%
+  pivot_longer(cols="Naturalized Citizen":"Noncitizen",names_to="measure",values_to="value") %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue")
+
+# Load/process the 1990 Census data downloaded through NHGIS. We have to work 
+# with two tables of data.
+fb1990a <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                           "General/Common Data Warehouse/NHGIS Downloads/",
+                           "City/Place of Birth (1970-1990)/",
+                           "nhgis0006_ds123_1990_place.csv")) %>%
+  mutate("Year"="1990",
+         "Born in WA"=E3N001,
+         "Born US Citizen (Outside WA)"=E3N002+E3N003+E3N004+E3N005+E3N006+E3N007+
+           E3N008) %>%
+  select("STATE","PLACE","Year":"Born US Citizen (Outside WA)") %>%
+  pivot_longer(cols="Born in WA":"Born US Citizen (Outside WA)",names_to="measure",values_to="value") %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue city") 
+fb1990b <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                           "General/Common Data Warehouse/NHGIS Downloads/",
+                           "City/Place of Birth (1970-1990)/",
+                           "nhgis0010_ds123_1990_place.csv")) %>%
+  mutate("Year"="1990",
+         "Naturalized Citizen"=E3G002+E3G005,
+         "Noncitizen"=E3G003+E3G006) %>%
+  select("STATE","PLACE","Year":"Noncitizen") %>%
+  pivot_longer(cols="Naturalized Citizen":"Noncitizen",names_to="measure",values_to="value") %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue city")
+
 # Now use the tidycensus package to import the place of birth data from the 2000
 # decennial Census. Then process the data.
 fb2000 <- get_decennial(geography="place",state="WA", sumfile = "sf3",year=2000,
@@ -460,9 +559,15 @@ fb2000 <- get_decennial(geography="place",state="WA", sumfile = "sf3",year=2000,
   pivot_longer(cols="Born in WA":"Noncitizen",names_to="measure",values_to="value") %>%
   filter(GEOID=="5305210") 
 
-# Now use the tidycensus package to import the ACS 1-Year data. This has to be 
-# done in 3 steps because the number of estimates in the DP02 table changes over
-# time.
+# Now join all of the processed Census data together & clean things up a bit.
+fb70to00 <- bind_rows(fb1970,fb1980a,fb1980b,fb1990a,fb1990b,fb2000) %>%
+  mutate("NAME"=case_when(is.na(NAME)~"Bellevue city, Washington",
+                          TRUE~NAME),
+         "GEOID"=case_when(is.na(GEOID)~"5305210",
+                           TRUE~GEOID)) %>%
+  select("GEOID","NAME","Year":"value")
+
+# Now use the tidycensus package to import the ACS 1-Year data. 
 years <- lst(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2021,2022,2023)
 fblabs <- map_dfr(years, ~
                      load_variables(year=.x,dataset="acs1"),
@@ -506,7 +611,7 @@ fb10toP <- fb10toP_r %>%
 
 # Finally combine the cleaned Census & ACS data together for a time-series in 
 # Bellevue from 1970-2021. Then clean up the working memory a bit.
-pob00toP <- bind_rows(fb2000,fb10toP) %>%
+pob70toP <- bind_rows(fb70to00,fb10toP) %>%
   group_by(Year) %>%
   mutate("year"=as.numeric(Year),
          "p"=prop.table(value),
@@ -516,32 +621,32 @@ pob00toP <- bind_rows(fb2000,fb10toP) %>%
 
 # Now make the figure for place of birth over time & clean up the working memory.
 pobplot <- 
-  ggplot(pob00toP,aes(x=`year`,y=`value`,
-                      fill=factor(`measure`,levels=c("Noncitizen","Naturalized Citizen",
-                                                     "Born US Citizen (Outside WA)","Born in WA")),
-                      text=paste("Estimate:",scales::comma(`value`),
-                                 "<br>",
-                                 "MOE: ±",scales::comma(round(`moe`,0)),
-                                 "<br>",
-                                 "Percent:",scales::percent(round(`p`,3)),
-                                 "<br>",
-                                 "Percent MOE: ±",scales::percent(round(`pmoe`,3))))) +   
-  geom_bar(stat="identity",width=1)+   
+  ggplot(pob70toP,aes(x=`year`,y=`value`,
+                       fill=factor(`measure`,levels=c("Noncitizen","Naturalized Citizen",
+                                                    "Born US Citizen (Outside WA)","Born in WA")),
+                       text=paste("Estimate:",scales::comma(`value`),
+                                  "<br>",
+                                  "MOE: ±",scales::comma(round(`moe`,0)),
+                                  "<br>",
+                                  "Percent:",scales::percent(round(`p`,3)),
+                                  "<br>",
+                                  "Percent MOE: ±",scales::percent(round(`pmoe`,3))))) +   # Fill column
+  geom_bar(stat="identity",width=1)+   # draw the bars
   labs(x="",y="",title="",fill="Place of Birth/Citizenship") +
-  scale_y_continuous(breaks=c(0,25000,50000,75000,100000,125000,150000),   
-                     labels=c("0","25k","50k","75k","100k","125k","150k")) + 
-  theme_minimal() +  
+  scale_y_continuous(breaks=c(0,25000,50000,75000,100000,125000,150000),   # Breaks
+                     labels=c("0","25k","50k","75k","100k","125k","150k")) + # Labels
+  theme_minimal() +  # Tufte theme from ggfortify
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
         panel.grid.minor.y=element_blank(),
         plot.title=element_text(hjust=.5), 
         axis.ticks=element_blank(),
         axis.text.x=element_text(hjust=0.5,size=14,family="sans"),
-        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   
+        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   # Center plot title
   scale_fill_manual(values = c("#4B9DA5","#3B6D64","#006598","#164356"))
 pobplotly <- ggplotly(pobplot,tooltip="text")
 pobplotly
-rm(list=ls(pattern="fb"),pob00toP,pobplot,years)
+rm(list=ls(pattern="fb"),pob70toP,pobplot,years)
 
 
 
@@ -556,13 +661,59 @@ rm(list=ls(pattern="fb"),pob00toP,pobplot,years)
 # home & with limited English proficiency. We want this over time in Bellevue &
 # across multiple geographies in the most recent year of data available.
 
-# 2000 Census data in two parts - one for total/non-LEP & one for LEP. Then 
-# clean things up & merge them.
+# 1980 Census data via NHGIS
+lang80 <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                          "General/Common Data Warehouse/NHGIS Downloads/",
+                          "City/English Proficiency (1980-1990)/",
+                          "nhgis0011_ds107_1980_place.csv")) %>% 
+  mutate("Total Lang Pop"=DGZ001+DGZ002+DGZ003+DGZ004+DGZ005+DGZ006+DGZ007+DGZ008+
+           DGZ009+DGZ010,
+         "English"=DGZ001+DGZ006,
+         "Not English"=`Total Lang Pop`-(DGZ001+DGZ006),
+         "Limited English Proficiency"=`Total Lang Pop`-
+           (DGZ001+DGZ002+DGZ004+DGZ006+DGZ007+DGZ009),
+         "Not English (Percent)"=`Not English`/`Total Lang Pop`,
+         "Limited English Proficiency (Percent)"=`Limited English Proficiency`/`Total Lang Pop`) %>%
+  select("STATE","PLACE","English":"Limited English Proficiency (Percent)") %>%
+  pivot_longer(cols="English":"Limited English Proficiency (Percent)",
+               values_to="estimate",names_to="variable") %>%
+  filter(STATE=="Washington" & PLACE=="Bellevue") %>%
+  mutate("GEOID"="5305210",
+         "NAME"="Bellevue city, Washington",
+         "Year"="1980") %>%
+  select("GEOID","NAME","Year","variable","estimate") 
+
+# 1990 Census data via NHGIS
+lang90 <- read_csv(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
+                          "General/Common Data Warehouse/NHGIS Downloads/",
+                          "City/English Proficiency (1980-1990)/",
+                          "nhgis0005_ds123_1990_place.csv",sep="")) %>% 
+  mutate("Total Lang Pop"=E26001+E26002+E26003+E26004+E26005+E26006+E26007+E26008+
+           E26009+E26010+E26011+E26012+E26013+E26014+E26015+E26016+E26017+E26018+
+           E26019+E26020+E26021+E26022+E26023+E26024+E26025+E26026+E26027+E26028+
+           E26029+E26030,
+         "English"=E26001+E26011+E26021,
+         "Not English"=`Total Lang Pop`-(E26001+E26011+E26021),
+         "Limited English Proficiency"=`Total Lang Pop`-
+           (E26001+E26002+E26005+E26008+E26011+E26012+E26015+E26018+E26021+E26022+
+              E26025+E26028),
+         "Not English (Percent)"=`Not English`/`Total Lang Pop`,
+         "Limited English Proficiency (Percent)"=`Limited English Proficiency`/`Total Lang Pop`) %>%
+  select("STUSAB","PLACEA","English":"Limited English Proficiency (Percent)") %>%
+  pivot_longer(cols="English":"Limited English Proficiency (Percent)",
+               values_to="estimate",names_to="variable") %>%
+  filter(STUSAB=="WA" & PLACEA=="05210") %>%
+  mutate("GEOID"="5305210",
+         "NAME"="Bellevue city, Washington",
+         "Year"="1990") %>%
+  select("GEOID","NAME","Year","variable","estimate") 
+
+# 2000 Census data
 langlabs <- load_variables(2000,"sf3") %>%
   filter(str_detect(name,"P019")) %>%
   select("variable"="name",
          "label") 
-
+  
 lang00a <- get_decennial(geography="place",state="WA",sumfile="sf3",year=2000,
                          variables = c("Total Lang Pop"="P109001",
                                        "English"="P109002",
@@ -587,6 +738,12 @@ lang00 <- bind_rows(lang00a,lang00b) %>%
   pivot_longer(cols="English":"Limited English Proficiency (Percent)",
                values_to="estimate",names_to="variable") %>%
   filter(GEOID=="5305210")
+
+# Now bind the processed 1980-2000 Census data for Bellevue
+langcens <- bind_rows(lang80,lang90,lang00) %>%
+  filter(variable %in% c("Not English (Percent)","Limited English Proficiency (Percent)"))
+
+
 
 # Now get each year of 1-Year ACS data for Bellevue. 
 # First extract and format labels for the desired measures from all of the years
@@ -649,9 +806,8 @@ langgeos <- map_dfr(geos, ~
 lang10toPgeo <- bind_rows(lang10toP,langgeos) %>%
   mutate("estimate"=estimate/100,
          "moe"=moe/100)
-
 # Now bind the combined Census data with the combined ACS data
-spoke00toP <- bind_rows(lang00,lang10toPgeo) %>%
+spoke80toP <- bind_rows(langcens,lang10toPgeo) %>%
   mutate("variable"=case_when(variable=="Not English (Percent)"~"Language Other Than English (Percent)",
                               TRUE~variable),
          "year"=as.numeric(Year))
@@ -683,15 +839,16 @@ bvspokeplot <-
   geom_errorbar(position=position_dodge(.9), color="#9E1B18",lwd=.9,linetype=2,width=.1) +
   labs(x="",y="",title="",fill="Language at Home") +
   scale_y_continuous(breaks=c(0,.1,.2,.3,.4,.5),   # Breaks
-                     labels=c("0","10%","20%","30%","40%","50%")) + 
-  theme_minimal() +  
+                     labels=c("0","10%","20%","30%","40%","50%")) + # Labels
+#  scale_x_continuous(breaks=c(1980,1990,2000,2010,2015,2021)) + # Labels
+  theme_minimal() +  # Tufte theme from ggfortify
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
         panel.grid.minor.y=element_blank(),
         plot.title=element_text(hjust=.5), 
         axis.ticks=element_blank(),
         axis.text.x=element_text(hjust=0.5,size=14,family="sans"),
-        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   
+        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   # Center plot title
   scale_fill_manual(values = c("#006598","#C16623"))
 bvspokeplotly <- ggplotly(bvspokeplot,tooltip="text") %>%
   layout(legend=list(x=.3,y=100))
@@ -701,8 +858,8 @@ bvspokeplotly
 # geographies in the most current year of data.
 spokecompplot <- 
   ggplot(data=spokecomp,aes(x=factor(`NAME`, 
-                                     levels=c("Bellevue","Seattle","King County",
-                                              "Washington","United States")),
+                               levels=c("Bellevue","Seattle","King County",
+                                        "Washington","United States")),
                             y=`estimate`,
                             ymin=`estimate`-`moe`,ymax=`estimate`+`moe`,            
                             fill=factor(`variable`, 
@@ -715,22 +872,22 @@ spokecompplot <-
   geom_errorbar(position=position_dodge(.9), color="#9E1B18",lwd=.9,linetype=2,width=.1) +
   labs(x="",y="",title="",fill="Language at Home") +
   scale_y_continuous(breaks=c(0,.1,.2,.3,.4,.5),   # Breaks
-                     labels=c("0","10%","20%","30%","40%","50%")) + 
-  theme_minimal() +  
+                     labels=c("0","10%","20%","30%","40%","50%")) + # Labels
+  theme_minimal() +  # Tufte theme from ggfortify
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
         panel.grid.minor.y=element_blank(),
         plot.title=element_text(hjust=.5), 
         axis.ticks=element_blank(),
         axis.text.x=element_text(hjust=0.5,size=14,family="sans"),
-        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +  
+        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   # Center plot title
   scale_fill_manual(values = c("#006598","#C16623"))
 spokecompplotly <- ggplotly(spokecompplot,tooltip="text") %>%
   layout(legend=list(x=.3,y=100))
 spokecompplotly
 
 # Now clean up the working memory a bit
-rm(bvspoke,bvspokeplot,geos,spoke00toP,spokecomp,spokecompplot)
+rm(bvspoke,bvspokeplot,spoke80toP,spokecomp,spokecompplot)
 
 
 
@@ -807,7 +964,7 @@ hohdat2 <- hohdat2a %>%
   filter(hhtype!="Total") %>%
   left_join(.,hohdat2c) %>%
   mutate("p"=e/grp_e,
-         "pmoe"=(1/grp_e)*sqrt((moe^2)-((p^2)*(grp_moe^2)))) 
+         "pmoe"=(1/grp_e)*sqrt((moe^2)-((p^2)*(grp_moe^2))))  
 
 # Now plot the household age/type data & clean up the working memory a bit
 hheadplot <- 
@@ -823,7 +980,7 @@ hheadplot <-
                                 "<br>",
                                 "Percent MOE: ±",scales::percent(round(`pmoe`,3))
                                 
-                                ))) +   
+                     ))) +   
   geom_bar(stat="identity",width=.6)+   
   labs(x="",y="",title="",fill = "Household Type") +
   scale_y_continuous(breaks=c(0,5000,10000,15000,20000,25000,30000,35000,40000,
@@ -837,7 +994,7 @@ hheadplot <-
         plot.title=element_text(hjust=.5), 
         axis.ticks=element_blank(),
         axis.text.x=element_text(hjust=0.5,size=14,family="sans"),
-        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   
+        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   # Center plot title
   scale_fill_manual(values = c("#006598","#C16623","#3B6D64","#4B9DA5"))
 hheadplotly <- ggplotly(hheadplot,tooltip="text",dynamicTicks=TRUE)
 hheadplotly
@@ -859,13 +1016,13 @@ rm(list=ls(pattern="hoh"),hheadplot)
 
 # Double check the available variables
 pumsvars <- pums_variables %>%
-  filter(year=="2022" & survey=="acs5")
+  filter(year=="2023" & survey=="acs5")
 
 # Load the data/desired variables along with the labels and person replication
 # weights.
-pumsdat5 <- get_pums(state="WA",survey="acs5",year=2022,
+pumsdat5 <- get_pums(state="WA",survey="acs5",year=syear,
                      rep_weights="person",recode=TRUE,  
-                     variables=c("PUMA10","PUMA20","AGEP","LANX","LANP","ENG")) 
+                     variables=c("PUMA","AGEP","LANX","LANP","ENG")) 
 
 # Now create two new variables denoting when a respondent speaks English less 
 # than "very well" & the primary language spoken in their home.
@@ -874,15 +1031,15 @@ pumsdat5a <- pumsdat5 %>%
                                               ENG=="1"|LANX=="2"~"No",
                                               TRUE~NA),
          "Language at Home"=case_when(LANX=="2"~"English",
+                                      LANP=="2000"~"Chinese",
                                       LANX=="1"~as.character(LANP_label),
                                       TRUE~NA))
 
 # Translate the data into a survey object in order to properly weight the 
-# responses, subset the Greater Bellevue PUMA, & drop observations with no 
-# language data (i.e. people under the age of 5).
+# responses.
 pumsdatsrvy5 <- pumsdat5a %>%
   to_survey(type = "person",design = "rep_weights") %>%
-  filter(PUMA10=="11608" |PUMA20=="23304") %>%
+  filter(PUMA=="23304") %>%
   filter(!is.na(`Language at Home`))
 
 # Now get the count of folks within the Greater Bellevue PUMA with limited 
@@ -904,9 +1061,10 @@ pumsqac5lang <- pumsdatsrvy5 %>%
   select("Language at Home","e_Speakers","moe_Speakers") %>%
   ungroup()
 
-# Now join the counts for LEP speakers and the primary languages as a whole. Then  
-# compute the percentage of all residents represented by limited English speakers 
-# of each language.
+# Now join the counts/percentages for limited English speakers and the community 
+# as a whole in the Bellevue PUMA & then bind the total resident count & its
+# associated MOEs as columns. Then compute the percentage of all residents 
+# represented by limited English speakers of each language.
 pumsqacc <- left_join(pumsqac5lang,pumsqac5lep) %>%
   mutate("Rank"=rank(desc(e_Speakers))) %>%
   filter(Rank<12,`Language at Home`!="English") %>%
@@ -920,7 +1078,6 @@ pumsqacc <- left_join(pumsqac5lang,pumsqac5lep) %>%
   mutate("measure"=case_when(measure=="Speakers"~"Total Speakers",
                              TRUE~"Speakers with Limited English Proficiency"))
 
-# Now plot the data & translate into a plotly.
 langplot <- 
   ggplot(data=pumsqacc,aes(x=`Language at Home`,y=`e`,
                            ymin=`e`-`moe`,ymax=`e`+`moe`,
@@ -937,8 +1094,8 @@ langplot <-
   geom_bar(position=position_dodge(), stat="identity") + 
   geom_errorbar(position=position_dodge(.9), color="#9E1B18",lwd=.9,linetype=2,width=.1) +
   labs(x="",y="",title="",fill="Group") +
-  scale_y_continuous(breaks=c(0,2000,4000,6000,8000,10000,12000,14000),   
-                     labels=c("0","2k","4k","6k","8k","10k","12k","14k")) + 
+  scale_y_continuous(breaks=c(0,3000,6000,9000,12000,15000,18000),   
+                     labels=c("0","3k","6k","9k","2k","15k","18k")) + 
   theme_minimal() +  # Tufte theme from ggfortify
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
@@ -946,7 +1103,7 @@ langplot <-
         plot.title=element_text(hjust=.5), 
         axis.ticks=element_blank(),
         axis.text.x=element_text(hjust=0.5,size=14,family="sans"),
-        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   
+        axis.text.y=element_text(hjust=0.5,size=14,family="sans")) +   # Center plot title
   scale_fill_manual(values = c("#006598","#C16623"))
 langplotly <- ggplotly(langplot,tooltip="text") %>%
   layout(legend=list(x=.3,y=100))
@@ -970,7 +1127,7 @@ raclabs <- map_dfr(years, ~
                    .id="Year") %>%
   filter(str_detect(name,"DP05")) %>%
   separate(col="label",into=c("type","col2","col3","col4","col5","col6"),sep="!!") %>%
-  filter(type=="Percent" & col2=="HISPANIC OR LATINO AND RACE") %>%
+  filter(type %in% c("Percent","Percent Estimate") & col2=="HISPANIC OR LATINO AND RACE") %>%
   mutate(across("type":"col5", ~str_remove(.x,":")),
          "label"=case_when(col3=="Hispanic or Latino (of any race)" & is.na(col4)~"Latino",
                            col4=="Hispanic or Latino (of any race)" & is.na(col5)~"Latino",
@@ -1021,9 +1178,12 @@ racdat <- map_dfr(years, ~
 racetsplot <- 
   ggplot(racdat,aes(x=`year2`,y=`e`,
                      ymin=`e`-`moe`,ymax=`e`+`moe`,
-                     color=factor(`label`,levels=c("White","Asian","Latino",
-                                                      "Multiracial","Black",
-                                                      "All Other Groups")),
+                     color=factor(`label`,levels=c("White",
+                                                   "Asian",
+                                                   "Latino",
+                                                   "Multiracial",
+                                                   "Black",
+                                                   "All Other Groups")),
                      group=`label`,
                      text=paste("Estimate:",scales::percent(round(`e`,3)),
                                 "<br>",
@@ -1036,7 +1196,7 @@ racetsplot <-
                               "Latino"="#3B6D64",
                               "Multiracial"="#4B9DA5",
                               "Black"="#660C53",
-                              "All Other Groups"="#4E842A")) +                                 
+                              "All Other Groups"="#4E842A")) +                                 # Set the fill colors
   theme_minimal() + 
   labs(x="",y="",title="",color="Race/Ethnicity") +
   scale_y_continuous(breaks=c(0,.1,.2,.3,.4,.5,.6,.7),
