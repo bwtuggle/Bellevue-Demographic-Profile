@@ -109,18 +109,10 @@ ofmpop1960<-read_excel(path=tempdat,sheet="Population",skip=3) %>%
   mutate("year"= as.double(year),
          "population"= as.double(population))
 
-# Now load the population data from 1953-1967 taken from the Bellevue Timeline
-# history book published by UW Press & combine the two data files
-bvuepop1953 <- read_excel(paste0("C:/Users/BWilliams/City of Bellevue/Community Data Team - Documents/",
-                          "General/Common Data Warehouse/Bellevue Population 1953-1967.xlsx"),
-                          sheet="Data") %>%
-  mutate(County="King",
-         Jurisdiction="Bellevue",
-         program="Bellevue Timeline")
-bvuepop <- bind_rows(bvuepop1953,ofmpop1960) %>%
+bvuepop <- ofmpop1960 %>%
   filter(!is.na(population)) %>%
   arrange(year) %>%
-  mutate("population2"=case_when(year %in% c(1953,1960,1970,1980,1990,2000,2010,
+  mutate("population2"=case_when(year %in% c(1968,1980,1990,2000,2010,
                                              2020,2025)~
                                    population,
                                  TRUE~NA))
@@ -138,7 +130,7 @@ popplot <- ggplot(data=bvuepop,
   scale_y_continuous(breaks=c(0,25000,50000,75000,100000,125000,150000), 
                      limits=c(0,165000),
                      labels=c("0","25k","50k","75k","100k","125k","150k")) +
-  scale_x_continuous(breaks=c(1953,1960,1970,1980,1990,2000,2010,2020,
+  scale_x_continuous(breaks=c(1968,1980,1990,2000,2010,2020,
                               2025)) +
   theme(panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
@@ -1327,6 +1319,7 @@ rm(ageTS,ageTS_r,agelabs,ageTSplot,years)
 # save the workspace in that folder.
 rm(acs1pro,acs1sub,acs1yr,acs5pro,acs5sub,acs5yr,decvars,years,hexcodes,syear)
 save.image(file="DPAppData.RData")
+
 
 
 
