@@ -82,13 +82,14 @@ ui <- fluidPage(
       tabsetPanel(                                                                       # Add tabs to the app
         type="tabs",                                                                     # Set tab types
         tabPanel("Race/Ethnicity (1/2)",                                                       # 1st tab - Race/Ethnicity map
-                 h3("Racial & Ethnic Composition of Bellevue Population by Census Tract (2019-2023)"),   # Label the tab title
+                 h3("Racial & Ethnic Composition of Bellevue Population by Census 
+                    Tract (2020-2024)"),   # Label the tab title
                  selectInput(inputId="var",                                              # Set the drop down options
                              label="Choose a Group to Display (Click Tract Area for Details)",
                              choices=groups),
                  leafletOutput("map"),                                      # Set plot size & object call name
                  p(strong("Source: "),                                                   # Add annotations
-                   tags$a(href="https://data.census.gov/","2019-2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2020-2024 American Community Survey."), 
                    "5-Year Data Profiles (Table DP05).",
                    "*Note: Dissimilarity Index scores are based on 2020 Census 
                    data & measure the within Census Tract racial/ethnic integration 
@@ -97,15 +98,15 @@ ui <- fluidPage(
                    would indicate complete segregation.")),
         
         tabPanel("Race/Ethnicity (2/2)",                                                       # 1st tab - Race/Ethnicity map
-                 h3("Racial & Ethnic Composition of Bellevue Population (2010-2023)"),   # Label the tab title
+                 h3("Racial & Ethnic Composition of Bellevue Population (2010-2024)"),   # Label the tab title
                  plotlyOutput("racets"),
                  p(strong("Source: "),                                                   # Add annotations
-                   tags$a(href="https://data.census.gov/","2010-2019 & 2021-2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2010-2024 American Community Survey."), 
                    "1-Year Data Profiles (Table DP05).")),
         
         
         tabPanel("Total Population",                                                     # 2nd tab - Population plot
-                 h3("Count of Bellevue Residents Over Time (1953-2025)"),
+                 h3("Count of Bellevue Residents Over Time (1968-2025)"),
                  plotlyOutput("popts"),
                  p(strong("Source: "), 
                    tags$a(href=paste("https://ofm.wa.gov/washington-data-research/",
@@ -113,76 +114,64 @@ ui <- fluidPage(
                                      "historical-estimates-april-1-population-and-housing-state-counties-and-cities",
                                      sep=""),
                           "Washington State Office of Financial Management."), 
-                   "April 1 Postcensal Estimates of Population (1960-Present); ",
-                   tags$a(href="https://eastsideheritagecenter.org/gift-shop/bellevue-timeline",
-                          "Bellevue Timeline."),
-                   "The Story of Washington's Leading Edge City From Homesteads 
-                   to High Rises, 1863-2003.")),
+                   "April 1 Postcensal Estimates of Population (1960-Present).")),
         
         
         tabPanel("Age & Sex",                                                            # 3rd tab - Age & Sex plot
-                 h3("Count of Bellevue Residents by Age & Sex (2023)"),
+                 h3("Count of Bellevue Residents by Age & Sex (2024)"),
                  plotlyOutput("age"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2024 American Community Survey."), 
                    "1-Year Detailed Tables (Table B01001).")),
         
         tabPanel("Age & Race/Ethnicity",                                                 # 4th tab - Age & Race/Ethnicity tab
-                 h3("Count of Bellevue Residents by Age & Race/Ethnicity (2019-2023)"),
+                 h3("Count of Bellevue Residents by Age & Race/Ethnicity (2020-2024)"),
                  plotlyOutput("rcage"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2019-2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2020-2024 American Community Survey."), 
                    "5-Year Detailed Tables (Table B01001B-I).")),
         
         tabPanel("Age Over Time",                                                 # 4th tab - Age & Race/Ethnicity tab
-                 h3("Percentage of Bellevue Residents by Age Group (2010-2023)"),
+                 h3("Percentage of Bellevue Residents by Age Group (2010-2024)"),
                  plotlyOutput("ageTS"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2023 1-Year Subject Tables & Data Profiles (Tables S0101 & DP05).")),
+                   "2010-2024 1-Year Subject Tables & Data Profiles (Tables S0101 & DP05).")),
         
         
         tabPanel("Place of Birth/Citizenship",                                           # 5th tab - Place of Birth/Citizenship tab
-                 h3("Count of Bellevue Residents by Place of Birth/Citizenship (1970-2023)"),
+                 h3("Count of Bellevue Residents by Place of Birth/Citizenship (2000-2024)"),
                  plotlyOutput("pob"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
-                   "1970-1990 Decennial Censuses (Tables NT25, NTPB9, NT33, NP37,
-                   & NP42). Retrieved via IPUMS NHGIS, University of Minnesota, ",
-                   tags$a(href="www.nhgis.org","www.nhgis.org;"),
-                   tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
                    "2000 Decennial Census (Table DP2);", 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2023 1-Year Data Profiles (Table DP02).")),
+                   "2010-2024 1-Year Data Profiles (Table DP02).")),
         
         tabPanel("English Speaking Ability (1/2)",                                      # 6th tab - 1st English Proficiency tab
                  h3("Percentage of Bellevue Residents by Primary Language Spoken at
-                    Home & English Proficiency (1980-2023)"),
+                    Home & English Proficiency (2000-2023)"),
                  plotlyOutput("bvspoke"),
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
-                   "1980-1990 Decennial Censuses (Tables NT27 & NP28). Retrieved 
-                   via IPUMS NHGIS, University of Minnesota, ",
-                   tags$a(href="www.nhgis.org","www.nhgis.org;"),
-                   tags$a(href="https://data.census.gov/","U.S. Census Bureau."), 
                    "2000 Decennial Census (Table DP2);", 
                    tags$a(href="https://data.census.gov/","American Community Survey."), 
-                   "2010-2019 & 2021-2023 1-Year Data Profiles (Table DP02).")),
+                   "2010-2024 1-Year Data Profiles (Table DP02).")),
         
         tabPanel("English Speaking Ability (2/2)",                                      # 7th tab - 2nd English Proficiency tab
                  h3("Percentage of Residents by Primary Language Spoken at
-                    Home & English Proficiency (2023)"),
+                    Home & English Proficiency (2024)"),
                  plotlyOutput("spokecomp1"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2024 American Community Survey."), 
                    "1-Year Data Profiles (Table DP02).")),
         
         tabPanel("Household Type & Age",                                                # 8th tab - 2nd English Proficiency tab
                  h3("Count of Bellevue Households by Household Type & Head of 
-                    Household Age (2023)"),
+                    Household Age (2024)"),
                  plotlyOutput("hhead"),
                  p(strong("Source: "), 
-                   tags$a(href="https://data.census.gov/","2023 American Community Survey."), 
+                   tags$a(href="https://data.census.gov/","2024 American Community Survey."), 
                    "1-Year Detailed Tables (Table B25011).")),
         
         tabPanel("Top 10 Languages",                                                    # 9th tab - Language tab
@@ -192,22 +181,6 @@ ui <- fluidPage(
                  p(strong("Source: "), 
                    tags$a(href="https://data.census.gov/","2019-2023 American Community Survey."), 
                    "5% PUMS Microdata Sample for Greater Bellevue PUMA.")),
-        
-        tabPanel("Quick Facts",                                                     # 2nd tab - Population plot
-                 h3("Quick Facts About the City of Bellevue"),
-                 tableOutput("qfacts"),
-                 p(strong("Source: "),
-                   tags$a(href=paste("https://ofm.wa.gov/washington-data-research/",
-                                     "population-demographics/population-estimates/",
-                                     "historical-estimates-april-1-population-and-housing-state-counties-and-cities",
-                                     sep=""),
-                          "Washington State Office of Financial Management."),
-                   "April 1 Postcensal Estimates of Population (2025); ",
-                   tags$a(href="https://data.census.gov/","2019-2023 American Community Survey."),
-                   "5-Year Detailed Tables (Table B01001).",
-                   tags$a(href="https://data.census.gov/","2023 American Community Survey."),
-                   "1-Year Detailed Tables & Data Profiles (Tables B19013, DP02, & DP05).")),
-        
         
       )
     )
@@ -263,7 +236,7 @@ server <- function(input,output){                                   # Create the
   output$rcage <- renderPlotly({                                   # 4th tab plot - Age & Race/Ethnicity
     rcageplotly
   })
-
+  
   output$ageTS <- renderPlotly({                                   # 4th tab plot - Age & Race/Ethnicity
     ageTSplotly
   })
@@ -288,9 +261,6 @@ server <- function(input,output){                                   # Create the
     langplotly
   })
   
-  output$qfacts <- renderTable({
-    facts
-  })
 }
 
 
@@ -299,7 +269,6 @@ server <- function(input,output){                                   # Create the
 shinyApp(ui=ui,server=server)
 
 # rsconnect::deployApp()
-
 
 
 
